@@ -1,0 +1,73 @@
+[project]
+name = "image_foundations"
+version = "0.1.0"
+description = "Foundational models in Image overview"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "ipython",
+    "notebook==6.0.2",
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "fastcore",
+    "requests",
+    "optimum-quanto",
+    "torch>=2.5.1",
+    "torchvision>=0.20.1",
+]
+
+# PyTorch: pick one. Mac = cpu. Linux = cpu or cu118/cu121/cu124 for GPU
+[project.optional-dependencies]
+cpu = ["torch", "torchvision"]
+cu118 = ["torch", "torchvision"]
+cu121 = ["torch", "torchvision"]
+cu124 = ["torch", "torchvision"]
+
+[tool.uv]
+dev-dependencies = []
+# Pick one PyTorch variant: cpu OR one of cu118/cu121/cu124
+conflicts = [
+    [{ extra = "cpu" }, { extra = "cu118" }],
+    [{ extra = "cpu" }, { extra = "cu121" }],
+    [{ extra = "cpu" }, { extra = "cu124" }],
+    [{ extra = "cu118" }, { extra = "cu121" }],
+    [{ extra = "cu118" }, { extra = "cu124" }],
+    [{ extra = "cu121" }, { extra = "cu124" }],
+]
+
+# PyTorch index URLs (explicit = only for torch/torchvision, not other deps)
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu118"
+url = "https://download.pytorch.org/whl/cu118"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+# Platform: Mac = cpu. Linux = cpu or cu118/cu121/cu124. Install: uv sync --extra cpu
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cu118", extra = "cu118", marker = "sys_platform == 'linux'" },
+    { index = "pytorch-cu121", extra = "cu121", marker = "sys_platform == 'linux'" },
+    { index = "pytorch-cu124", extra = "cu124", marker = "sys_platform == 'linux'" },
+]
+torchvision = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cu118", extra = "cu118", marker = "sys_platform == 'linux'" },
+    { index = "pytorch-cu121", extra = "cu121", marker = "sys_platform == 'linux'" },
+    { index = "pytorch-cu124", extra = "cu124", marker = "sys_platform == 'linux'" },
+]
