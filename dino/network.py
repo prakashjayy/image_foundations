@@ -121,7 +121,7 @@ class ResNetBackbone(nn.Module):
         self.layer3 = self._make_layer(ch[1], ch[2], bl[2], stride=2)
         self.layer4 = self._make_layer(ch[2], ch[3], bl[3], stride=2)
 
-        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.pool = nn.AdaptiveMaxPool2d(1)
 
     @staticmethod
     def _make_layer(in_ch: int, out_ch: int, n: int, stride: int) -> nn.Sequential:
