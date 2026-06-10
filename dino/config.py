@@ -34,7 +34,7 @@ class DataConfig:
     # Local views: paper (0.05, 0.32) at 96×96. For MNIST: (0.2, 0.5) → 6–14px.
     local_crop_size: int = 14
     local_crop_scale: tuple = (0.2, 0.5)
-    n_local_crops: int = 4           # Paper uses 6–10; 4 is sufficient for small dataset
+    n_local_crops: int = 6           # Paper uses 6–10; try 6 for more view diversity
 
     # k for k-NN evaluation. Paper uses k=20 (Appendix F.1, "consistently best").
     knn_k: int = 20
