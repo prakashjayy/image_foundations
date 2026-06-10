@@ -121,9 +121,6 @@ class ResNetBackbone(nn.Module):
         self.layer3 = self._make_layer(ch[1], ch[2], bl[2], stride=2)
         self.layer4 = self._make_layer(ch[2], ch[3], bl[3], stride=2)
 
-        # Single MHSA at the deepest feature map (paper analogue: ViT last block).
-        self.attn = SpatialAttention(ch[3], cfg.attn_heads, cfg.attn_dropout)
-
         self.pool = nn.AdaptiveAvgPool2d(1)
 
     @staticmethod
@@ -139,7 +136,6 @@ class ResNetBackbone(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
-        x = self.attn(x)
         x = self.pool(x).flatten(1)     # (B, feat_dim)
         return x
 
