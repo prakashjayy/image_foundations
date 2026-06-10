@@ -226,7 +226,7 @@ class TrainConfig:
 @dataclass
 class EvalConfig:
     # Run k-NN evaluation every N epochs during training.
-    knn_eval_every_n_epochs: int = 10
+    knn_eval_every_n_epochs: int = 1
 
     # Fraction of training data to use as the k-NN feature bank.
     # For MNIST the full training set (60K) is small enough to use entirely.
