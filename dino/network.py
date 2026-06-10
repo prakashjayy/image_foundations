@@ -49,9 +49,9 @@ class BasicBlock(nn.Module):
             self.shortcut = nn.Identity()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = F.relu(self.bn1(self.conv1(x)), inplace=True)
+        out = F.silu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
-        return F.relu(out + self.shortcut(x), inplace=True)
+        return F.silu(out + self.shortcut(x))
 
 
 class SpatialAttention(nn.Module):
@@ -113,7 +113,7 @@ class ResNetBackbone(nn.Module):
         self.stem = nn.Sequential(
             nn.Conv2d(in_channels, ch[0], 3, padding=1, bias=False),
             nn.BatchNorm2d(ch[0]),
-            nn.ReLU(inplace=True),
+            nn.SiLU(),
         )
 
         self.layer1 = self._make_layer(ch[0], ch[0], bl[0], stride=1)
