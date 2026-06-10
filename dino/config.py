@@ -28,7 +28,7 @@ class DataConfig:
     # Scale for global views: (0.32, 1.0). Paper found 0.32 optimal (Appendix E).
     # For 32×32 MNIST: global crops sampled at (0.5, 1.0) → 16–32px range.
     global_crop_size: int = 28
-    global_crop_scale: tuple = (0.5, 1.0)
+    global_crop_scale: tuple = (0.6, 1.0)
     n_global_crops: int = 2          # Paper: always 2 global views fed to teacher + student
 
     # Local views: paper (0.05, 0.32) at 96×96. For MNIST: (0.2, 0.5) → 6–14px.
