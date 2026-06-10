@@ -56,20 +56,20 @@ class BackboneConfig:
 
     # Feature dimension after global average pooling.
     # Paper: 2048 for ResNet-50, 384 for ViT-S. Small MNIST network → 256.
-    feat_dim: int = 256
+    feat_dim: int = 512
 
     # ResNet layer widths [layer1, layer2, layer3, layer4].
     # Kept small: MNIST has far less visual complexity than ImageNet.
-    channels: tuple = (32, 64, 128, 256)
+    channels: tuple = (64, 128, 256, 512)
 
     # Number of residual blocks per stage.
     blocks: tuple = (1, 1, 2, 1)
 
     # Self-attention is placed after layer4 (before pooling).
     # Paper (ViT): 12 attention blocks, 6 heads for ViT-S.
-    # We use a single multi-head self-attention layer; 4 heads matches
-    # feat_dim=256 cleanly (64 dims/head).
-    attn_heads: int = 4
+    # We use a single multi-head self-attention layer; 8 heads matches
+    # feat_dim=512 cleanly (64 dims/head).
+    attn_heads: int = 8
 
     # Dropout in the attention module (not used in paper, added for small dataset).
     attn_dropout: float = 0.0
