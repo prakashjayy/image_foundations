@@ -110,7 +110,7 @@ class DINOModule(L.LightningModule):
 
         # k-NN eval sample size.  Default: 10 % of MNIST val set (10 000 → 1 000).
         # A 1 000×1 000 similarity matrix fits easily in memory and runs in < 1 s.
-        self.knn_samples = knn_samples if knn_samples is not None else int(10_000 * 0.10)
+        self.knn_samples = knn_samples if knn_samples is not None else int(10_000 * 0.50)
 
         # Buffers for accumulating validation features (cleared each epoch).
         self._val_feats:  list[torch.Tensor] = []
