@@ -92,7 +92,7 @@ class HeadConfig:
 
     # Number of MLP layers before the L2 bottleneck.
     # Paper: 3 (total 4 linear layers including the final weight-norm layer).
-    n_layers: int = 3
+    n_layers: int = 2
 
     # Bottleneck dimension (output of L2 norm, input of weight-norm FC).
     # Paper: 256. Kept the same here; not expensive regardless of K.
