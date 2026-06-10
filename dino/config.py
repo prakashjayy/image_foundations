@@ -32,7 +32,7 @@ class DataConfig:
     n_global_crops: int = 2          # Paper: always 2 global views fed to teacher + student
 
     # Local views: paper (0.05, 0.32) at 96×96. For MNIST: (0.2, 0.5) → 6–14px.
-    local_crop_size: int = 14
+    local_crop_size: int = 16
     local_crop_scale: tuple = (0.2, 0.5)
     n_local_crops: int = 6           # Paper uses 6–10; try 6 for more view diversity
 
