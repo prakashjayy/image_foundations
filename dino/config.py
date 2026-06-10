@@ -213,7 +213,7 @@ class TrainConfig:
 
     # Gradient clipping. Paper does not mention it, but useful for stability
     # with small datasets.
-    gradient_clip_val: float = 3.0
+    gradient_clip_val: float = 5.0
 
     # Logging interval (every N steps).
     log_every_n_steps: int = 50
