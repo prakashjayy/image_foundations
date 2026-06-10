@@ -219,40 +219,38 @@ class DINOModule(L.LightningModule):
         self.log("val/knn_accuracy",  acc,      prog_bar=True)
         self.log("val/knn_n_samples", float(n), prog_bar=False)
 
-    @staticmethod
     def _knn_classify(
+        self,
         feats:  torch.Tensor,   # (N, D)  L2-normalised val subsample
         labels: torch.Tensor,   # (N,)
         k: int,
     ) -> float:
-        """Self-similarity k-NN on a subsampled validation set.
+        """Temperature-weighted k-NN on a subsampled validation set.
 
-        Builds an N×N cosine-similarity matrix (both query and reference are
-        the same N points — no separate training bank).  For each sample i:
-          1. Mask the diagonal so a point is never its own neighbour.
-          2. Take the top-k most similar neighbours.
-          3. Count what fraction of those k neighbours share the true label.
-          4. Correct  ↔  fraction > 0.5  (strict majority).
-
-        Why "strictly > 0.5" rather than argmax?
-          If k neighbours are split 3-3 between two classes (k=6), neither has
-          a clear majority and argmax picks arbitrarily.  The >50 % threshold
-          treats ambiguous cases as incorrect, which is a more conservative
-          (and informative) metric.
+        Paper (Appendix F.1, following Wu et al. 2018): votes are weighted by
+        exp(cosine_sim / T) so near neighbours dominate.  Prediction is the
+        class with the highest total weighted vote (argmax, not majority).
         """
         N   = feats.shape[0]
+        T   = self.cfg.data.knn_temperature
+        n_classes = int(labels.max().item()) + 1
+
         sim = feats @ feats.T                           # (N, N)  cosine similarity
         sim.fill_diagonal_(float("-inf"))               # exclude self
 
-        topk_idx       = sim.topk(k, dim=1).indices    # (N, k)
+        topk_sim, topk_idx = sim.topk(k, dim=1)        # (N, k)
         neighbor_labels = labels[topk_idx]              # (N, k)
 
-        # Fraction of neighbours that share the true label.
-        true_label_frac = (
-            (neighbor_labels == labels.unsqueeze(1)).float().mean(dim=1)
-        )                                               # (N,)
+        # Temperature-scaled weights.
+        weights = (topk_sim / T).exp()                  # (N, k)
 
-        return (true_label_frac > 0.5).float().mean().item()
+        # Weighted vote per class: (N, k, C) → sum over k → (N, C).
+        neighbor_one_hot = torch.zeros(N, k, n_classes, device=feats.device)
+        neighbor_one_hot.scatter_(2, neighbor_labels.unsqueeze(2), 1.0)
+        votes = (weights.unsqueeze(2) * neighbor_one_hot).sum(1)  # (N, C)
+
+        pred = votes.argmax(1)
+        return (pred == labels.to(feats.device)).float().mean().item()
 
     # ------------------------------------------------------------- optimizers
 
