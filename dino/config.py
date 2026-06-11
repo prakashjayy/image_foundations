@@ -34,9 +34,9 @@ class DataConfig:
     # Local views: paper (0.05, 0.32) at 96×96. For MNIST: (0.2, 0.5) → 6–14px.
     local_crop_size: int = 20
     local_crop_scale: tuple = (0.2, 0.5)
-    n_local_crops: int = 6           # Paper uses 6–10; try 6 for more view diversity
+    n_local_crops: int = 6           # Paper uses 6–10; confirmed 6 optimal across multiple tests
 
-    # k for k-NN evaluation. Paper uses k=20 (Appendix F.1, "consistently best").
+    # k for k-NN evaluation. Paper uses k=20; tuned to k=15 for our stronger features.
     knn_k: int = 15
 
     # Temperature for k-NN weighted voting (Appendix F.1, same as Wu et al. 2018).

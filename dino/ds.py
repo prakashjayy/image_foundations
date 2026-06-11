@@ -9,7 +9,7 @@ The DataLoader collate function re-organises this into:
   crops : list of V tensors, each (B, 1, H, W)   — one tensor per view
   labels: (B,) int64 tensor
 
-V = n_global_crops + n_local_crops  (6 by default: 2 global + 4 local)
+V = n_global_crops + n_local_crops  (8 by default: 2 global + 6 local)
 B = batch size
 
 Only global crops are passed to the teacher; local + global go to the student.
