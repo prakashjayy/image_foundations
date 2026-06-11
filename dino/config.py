@@ -37,7 +37,7 @@ class DataConfig:
     n_local_crops: int = 6           # Paper uses 6–10; try 6 for more view diversity
 
     # k for k-NN evaluation. Paper uses k=20 (Appendix F.1, "consistently best").
-    knn_k: int = 20
+    knn_k: int = 15
 
     # Temperature for k-NN weighted voting (Appendix F.1, same as Wu et al. 2018).
     knn_temperature: float = 0.06
