@@ -128,7 +128,7 @@ class TemperatureConfig:
     # For MNIST 100-epoch run, warmup over first 10 epochs.
     teacher_temp_start: float = 0.03
     teacher_temp_end: float = 0.07
-    teacher_temp_warmup_epochs: int = 10   # Paper: 30 epochs for 300-epoch run
+    teacher_temp_warmup_epochs: int = 15   # Paper: 30 epochs for 300-epoch run
 
 
 # ---------------------------------------------------------------------------
