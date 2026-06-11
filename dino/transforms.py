@@ -14,8 +14,8 @@ solarization, random flip.  For single-channel grayscale we adapt:
   Gaussian blur   → kept; paper applies it to global views with p=0.5
 
 Two scales of crops (paper Appendix E):
-  Global (28×28, scale 0.5–1.0): strong blur + contrast; reliable teacher targets
-  Local  (14×14, scale 0.2–0.5): lighter aug; student must match teacher from
+  Global (28×28, scale 0.7–1.0): strong blur + contrast; reliable teacher targets
+  Local  (20×20, scale 0.2–0.5): lighter aug; student must match teacher from
                                   small, partial views (local-to-global learning)
 """
 
@@ -33,7 +33,8 @@ def global_transform(cfg: DataConfig) -> transforms.Compose:
 
     Paper: "global views use a larger resolution and stronger augmentations
     to provide reliable teacher targets" (Sec 3.1, Appendix E).
-    Scale range (0.5, 1.0) chosen for MNIST (paper uses 0.32–1.0 at 224px).
+    Scale range (0.7, 1.0) chosen for MNIST — larger minimum ensures the teacher
+    always sees most of the digit (tuned: 0.5→0.6→0.7 each improved, 0.75 regressed).
     """
     return transforms.Compose([
         # Primary spatial augmentation — same mechanism as paper but smaller
@@ -64,13 +65,22 @@ def global_transform(cfg: DataConfig) -> transforms.Compose:
     ])
 
 
+def clean_transform(cfg: DataConfig) -> transforms.Compose:
+    """No-augmentation transform for kNN bank / query evaluation."""
+    return transforms.Compose([
+        transforms.Resize(cfg.global_crop_size),
+        transforms.ToTensor(),
+        transforms.Normalize(MNIST_MEAN, MNIST_STD),
+    ])
+
+
 def local_transform(cfg: DataConfig) -> transforms.Compose:
     """Lighter augmentation for the n_local small views fed only to student.
 
-    Paper: local crops are small (96px vs 224px global) and use the same
-    augmentation pipeline as global but at a smaller scale (0.05–0.32).
-    For MNIST we reduce blur probability and skip contrast distortion
-    so the local patches still contain recognisable digit structure.
+    Paper: local crops are small (96px vs 224px global) with scale (0.05–0.32).
+    For MNIST, local_crop_size=20 (tuned: 14→16→18→20 each improved, 22 regressed).
+    Lighter augmentation than global: local patches already have limited structure
+    so heavy distortion removes all discriminative content.
     """
     return transforms.Compose([
         transforms.RandomResizedCrop(

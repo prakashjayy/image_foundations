@@ -49,9 +49,9 @@ class BasicBlock(nn.Module):
             self.shortcut = nn.Identity()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = F.relu(self.bn1(self.conv1(x)), inplace=True)
+        out = F.silu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
-        return F.relu(out + self.shortcut(x), inplace=True)
+        return F.silu(out + self.shortcut(x))
 
 
 class SpatialAttention(nn.Module):
@@ -113,7 +113,7 @@ class ResNetBackbone(nn.Module):
         self.stem = nn.Sequential(
             nn.Conv2d(in_channels, ch[0], 3, padding=1, bias=False),
             nn.BatchNorm2d(ch[0]),
-            nn.ReLU(inplace=True),
+            nn.SiLU(),
         )
 
         self.layer1 = self._make_layer(ch[0], ch[0], bl[0], stride=1)
@@ -121,10 +121,7 @@ class ResNetBackbone(nn.Module):
         self.layer3 = self._make_layer(ch[1], ch[2], bl[2], stride=2)
         self.layer4 = self._make_layer(ch[2], ch[3], bl[3], stride=2)
 
-        # Single MHSA at the deepest feature map (paper analogue: ViT last block).
-        self.attn = SpatialAttention(ch[3], cfg.attn_heads, cfg.attn_dropout)
-
-        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.pool = nn.AdaptiveMaxPool2d(1)
 
     @staticmethod
     def _make_layer(in_ch: int, out_ch: int, n: int, stride: int) -> nn.Sequential:
@@ -139,7 +136,6 @@ class ResNetBackbone(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
-        x = self.attn(x)
         x = self.pool(x).flatten(1)     # (B, feat_dim)
         return x
 
