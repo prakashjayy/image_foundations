@@ -40,7 +40,7 @@ class DataConfig:
     knn_k: int = 20
 
     # Temperature for k-NN weighted voting (Appendix F.1, same as Wu et al. 2018).
-    knn_temperature: float = 0.07
+    knn_temperature: float = 0.06
 
 
 # ---------------------------------------------------------------------------
