@@ -182,7 +182,7 @@ class OptimizerConfig:
 class ScheduleConfig:
     # Warmup: paper linearly ramps LR for the first 10 epochs (Sec 3 Impl.).
     # For 100-epoch MNIST run we use the same 10-epoch warmup.
-    warmup_epochs: int = 2
+    warmup_epochs: int = 3
 
     # After warmup: cosine decay to 0 (Sec 3 Impl.).
     # Paper trains 300–800 epochs on ImageNet. MNIST converges faster;
