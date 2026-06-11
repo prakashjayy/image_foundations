@@ -13,6 +13,7 @@ Loads the best checkpoint, saves weights as best.pth, then produces:
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from collections import Counter
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -340,25 +341,82 @@ for col, lbl in enumerate(header_labels):
                color="#5dade2" if col == 0 else DIM,
                transform=ax_nn.transAxes, fontweight="bold" if col == 0 else "normal")
 
-# ── Panel G: Feature norm distribution ───────────────────────────────────────
-ax_norm = fig.add_subplot(gs[3, :2])
-# After L2 norm, all norms should be 1.0 — show raw norms BEFORE normalisation
-with torch.no_grad():
-    ds = MNISTClean(cfg, train=False, root="./data")
-    loader = DataLoader(ds, batch_size=512, shuffle=False, num_workers=4)
-    raw_norms = []
-    for imgs, _ in loader:
-        imgs = imgs.to(DEVICE)
-        f = student.get_features(imgs)
-        raw_norms.append(f.norm(dim=-1).cpu())
-raw_norms = torch.cat(raw_norms).numpy()
+# ── Panel G: Wrong predictions (top confusion pairs, high-confidence first) ───
+# Collect wrong prediction metadata
+wrong_mask  = ~best_correct
+wrong_true  = query_labels[wrong_mask].numpy()
+wrong_pred  = best_preds[wrong_mask].numpy()
+wrong_conf  = best_conf[wrong_mask].numpy()
+wrong_idxs  = torch.where(wrong_mask)[0].numpy()
 
-ax_norm.hist(raw_norms, bins=60, color="#a569bd", alpha=0.8, density=True, zorder=3)
-ax_norm.axvline(np.mean(raw_norms), color=WHITE, linewidth=1.2, linestyle="--")
-ax_norm.text(np.mean(raw_norms) + 0.1, ax_norm.get_ylim()[1] * 0.8,
-             f"mean={np.mean(raw_norms):.1f}", color=WHITE, fontsize=8)
-style(ax_norm, title="Raw Feature Norm Distribution  (before L2 normalisation)",
-      xlabel="||f(x)||₂", ylabel="Density")
+pair_counts = Counter(zip(wrong_true.tolist(), wrong_pred.tolist()))
+top_pairs   = [pair for pair, _ in pair_counts.most_common(5)]
+
+ax_wrong = fig.add_subplot(gs[3, :2])
+ax_wrong.set_facecolor(PANEL_BG)
+ax_wrong.set_title(
+    f"Most Common Wrong Predictions  (k=15, {wrong_mask.sum()} errors total)"
+    "  ·  sorted high-confidence first",
+    color=WHITE, fontsize=9.5, pad=6, fontweight="bold",
+)
+ax_wrong.axis("off")
+
+N_SHOW  = 6   # images per pair
+LABEL_W = 0.14   # fraction of panel width reserved for row label
+cell_w  = (1.0 - LABEL_W) / N_SHOW
+cell_h  = 1.0 / len(top_pairs)
+
+for row, (true_c, pred_c) in enumerate(top_pairs):
+    mask     = (wrong_true == true_c) & (wrong_pred == pred_c)
+    idxs     = wrong_idxs[mask]
+    confs    = wrong_conf[mask]
+    order    = np.argsort(-confs)[:N_SHOW]   # highest confidence first
+    sel_idxs = idxs[order]
+    sel_conf = confs[order]
+
+    y_top = 1.0 - row * cell_h
+
+    # Row label: true → pred + count
+    ax_wrong.text(
+        LABEL_W / 2, y_top - cell_h / 2,
+        f"True {true_c} → Pred {pred_c}\n(n={mask.sum()})",
+        ha="center", va="center", fontsize=8,
+        color=CLASS_COLORS[true_c], transform=ax_wrong.transAxes,
+        fontweight="bold",
+    )
+
+    for col, (val_idx, conf_val) in enumerate(zip(sel_idxs, sel_conf)):
+        img_pil = base_val[int(val_idx)][0]
+        x_left  = LABEL_W + col * cell_w
+
+        inset = ax_wrong.inset_axes(
+            [x_left + 0.004, y_top - cell_h + 0.01,
+             cell_w - 0.008, cell_h - 0.02],
+            transform=ax_wrong.transAxes,
+        )
+        inset.imshow(img_pil, cmap="gray", vmin=0, vmax=255)
+        inset.axis("off")
+
+        # Red border — all wrong predictions
+        for sp in inset.spines.values():
+            sp.set_visible(True)
+            sp.set_edgecolor("#e74c3c")
+            sp.set_linewidth(1.8)
+
+        # Confidence below image
+        inset.text(0.5, -0.16, f"conf {conf_val:.2f}",
+                   ha="center", va="top", fontsize=6.5, color="#e74c3c",
+                   transform=inset.transAxes)
+
+# Column headers
+ax_wrong.text(LABEL_W / 2, 1.03, "Confusion pair",
+              ha="center", va="bottom", fontsize=8, color=DIM,
+              transform=ax_wrong.transAxes)
+for col in range(N_SHOW):
+    x_c = LABEL_W + (col + 0.5) * cell_w
+    ax_wrong.text(x_c, 1.03, f"Example {col+1}",
+                  ha="center", va="bottom", fontsize=8, color=DIM,
+                  transform=ax_wrong.transAxes)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Title

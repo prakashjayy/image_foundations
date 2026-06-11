@@ -18,6 +18,7 @@ dependencies = [
     "pypdf>=6.13.1",
     "lightning>=2.6.5",
     "tensorboard>=2.20.0",
+    "scikit-learn>=1.7.2",
 ]
 
 # PyTorch: pick one. Mac = cpu. Linux = cpu or cu118/cu121/cu124 for GPU
