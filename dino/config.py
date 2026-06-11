@@ -126,7 +126,7 @@ class TemperatureConfig:
     # Paper: linear warmup from 0.04 → 0.07 over first 30 epochs (Sec 3 /
     # Appendix D). Starting low prevents collapse in early training.
     # For MNIST 100-epoch run, warmup over first 10 epochs.
-    teacher_temp_start: float = 0.04
+    teacher_temp_start: float = 0.03
     teacher_temp_end: float = 0.07
     teacher_temp_warmup_epochs: int = 10   # Paper: 30 epochs for 300-epoch run
 
