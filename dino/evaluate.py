@@ -182,22 +182,26 @@ gs  = gridspec.GridSpec(
 ax_k = fig.add_subplot(gs[0, :2])
 best_k_idx = int(np.argmax(k_accs))
 
+ax_k.set_xscale("log")
 ax_k.plot(K_VALUES, k_accs, color="#5dade2", linewidth=2.2, zorder=3)
 ax_k.scatter(K_VALUES, k_accs, color="#5dade2", s=70, zorder=4,
              edgecolors=WHITE, linewidths=0.8)
 ax_k.scatter([K_VALUES[best_k_idx]], [k_accs[best_k_idx]],
              color="#f39c12", s=130, zorder=5, edgecolors=WHITE, linewidths=1.0)
-for k, acc in zip(K_VALUES, k_accs):
-    va = "bottom" if k != K_VALUES[best_k_idx] else "top"
-    dy = 0.05 if va == "bottom" else -0.08
+# Stagger labels above/below to avoid crowding at small k
+for i, (k, acc) in enumerate(zip(K_VALUES, k_accs)):
+    is_best = (k == K_VALUES[best_k_idx])
+    va  = "top"    if is_best else ("bottom" if i % 2 == 0 else "top")
+    dy  = -0.10    if is_best else (0.06     if va == "bottom" else -0.10)
     ax_k.text(k, acc + dy, f"{acc:.2f}%", ha="center", va=va,
-              fontsize=7.5, color=WHITE)
+              fontsize=7.5, color="#f39c12" if is_best else WHITE)
 ax_k.axhline(k_accs[best_k_idx], color="#f39c12", linewidth=0.7,
              linestyle="--", alpha=0.4)
 style(ax_k, title="kNN Accuracy vs k  (60k train bank, T=0.06)",
-      xlabel="k  (number of neighbours)", ylabel="Accuracy (%)")
+      xlabel="k  (number of neighbours, log scale)", ylabel="Accuracy (%)")
 ax_k.set_ylim(min(k_accs) - 1.5, max(k_accs) + 1.5)
 ax_k.set_xticks(K_VALUES)
+ax_k.set_xticklabels([str(k) for k in K_VALUES], color=DIM)
 ax_k.grid(axis="x", color=GRID, linewidth=0.5, linestyle=":", alpha=0.5)
 
 # ── Panel B: Confidence histogram ────────────────────────────────────────────
@@ -355,8 +359,7 @@ top_pairs   = [pair for pair, _ in pair_counts.most_common(5)]
 ax_wrong = fig.add_subplot(gs[3, :2])
 ax_wrong.set_facecolor(PANEL_BG)
 ax_wrong.set_title(
-    f"Most Common Wrong Predictions  (k=15, {wrong_mask.sum()} errors total)"
-    "  ·  sorted high-confidence first",
+    f"Top-5 Confusion Pairs  ·  {wrong_mask.sum()} total errors  ·  high-confidence mistakes first",
     color=WHITE, fontsize=9.5, pad=6, fontweight="bold",
 )
 ax_wrong.axis("off")
@@ -408,15 +411,6 @@ for row, (true_c, pred_c) in enumerate(top_pairs):
                    ha="center", va="top", fontsize=6.5, color="#e74c3c",
                    transform=inset.transAxes)
 
-# Column headers
-ax_wrong.text(LABEL_W / 2, 1.03, "Confusion pair",
-              ha="center", va="bottom", fontsize=8, color=DIM,
-              transform=ax_wrong.transAxes)
-for col in range(N_SHOW):
-    x_c = LABEL_W + (col + 0.5) * cell_w
-    ax_wrong.text(x_c, 1.03, f"Example {col+1}",
-                  ha="center", va="bottom", fontsize=8, color=DIM,
-                  transform=ax_wrong.transAxes)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Title
