@@ -36,7 +36,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 from torch.utils.data import DataLoader
 
 from dino.config import DINOConfig, cfg as default_cfg
-from dino.ds import MNISTMultiCrop, collate_multicrop
+from dino.ds import MNISTClean, MNISTMultiCrop, collate_multicrop
 from dino.loss import DINOLoss
 from dino.network import build_student_teacher
 
@@ -91,6 +91,16 @@ class DINODataModule(L.LightningDataModule):
             collate_fn=collate_multicrop,
         )
 
+    def _clean_loader(self, train: bool) -> DataLoader:
+        ds = MNISTClean(self.cfg, train=train, root=self.data_root)
+        return DataLoader(
+            ds,
+            batch_size=self.cfg.train.batch_size * 2,
+            shuffle=False,
+            num_workers=self.cfg.train.num_workers,
+            pin_memory=True,
+        )
+
 
 # ---------------------------------------------------------------------------
 # Lightning module
@@ -108,13 +118,8 @@ class DINOModule(L.LightningModule):
         self.teacher_momentum = cfg.momentum.momentum_start
         self._total_steps     = 1   # overwritten in on_train_start
 
-        # k-NN eval sample size.  Default: 10 % of MNIST val set (10 000 → 1 000).
-        # A 1 000×1 000 similarity matrix fits easily in memory and runs in < 1 s.
-        self.knn_samples = knn_samples if knn_samples is not None else int(10_000 * 1.00)
-
-        # Buffers for accumulating validation features (cleared each epoch).
-        self._val_feats:  list[torch.Tensor] = []
-        self._val_labels: list[torch.Tensor] = []
+        # k-NN eval sample size.  Default: full MNIST val set (10 000).
+        self.knn_samples = knn_samples if knn_samples is not None else 10_000
 
     # ------------------------------------------------------------------ train
 
@@ -180,8 +185,7 @@ class DINOModule(L.LightningModule):
     # ---------------------------------------------------------------- validate
 
     def on_validation_epoch_start(self) -> None:
-        self._val_feats  = []
-        self._val_labels = []
+        pass
 
     def validation_step(self, batch: tuple, batch_idx: int) -> torch.Tensor:
         crops, labels = batch
@@ -192,65 +196,69 @@ class DINOModule(L.LightningModule):
         teacher_out = [self.teacher(v) for v in crops[:n_global]]
         loss = self.criterion(student_out, teacher_out, self.teacher_temp)
         self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
-
-        # Collect L2-normalised backbone features for k-NN at epoch end.
-        # Global crop[0] provides a canonical view (consistent crop size).
-        feats = F.normalize(self.student.get_features(crops[0]), dim=-1)
-        self._val_feats.append(feats.cpu())
-        self._val_labels.append(labels.cpu())
-
         return loss
+
+    @torch.no_grad()
+    def _collect_features(self, loader) -> tuple[torch.Tensor, torch.Tensor]:
+        feats, labels = [], []
+        was_training = self.student.training
+        self.student.eval()
+        for imgs, lbls in loader:
+            imgs = imgs.to(self.device)
+            f = F.normalize(self.student.get_features(imgs), dim=-1)
+            feats.append(f.cpu())
+            labels.append(lbls)
+        if was_training:
+            self.student.train()
+        return torch.cat(feats), torch.cat(labels)
 
     def on_validation_epoch_end(self) -> None:
         if self.current_epoch % self.cfg.eval.knn_eval_every_n_epochs != 0:
             return
 
-        all_feats  = torch.cat(self._val_feats)    # (N_val, D)
-        all_labels = torch.cat(self._val_labels)   # (N_val,)
+        dm = self.trainer.datamodule
+        bank_feats, bank_labels = self._collect_features(dm._clean_loader(train=True))
+        query_feats, query_labels = self._collect_features(dm._clean_loader(train=False))
 
-        # Draw a random subsample from the full val set.
-        # Default: 1 000 samples → 1 000×1 000 similarity matrix (~4 MB, < 1 s).
-        n = min(self.knn_samples, len(all_feats))
-        perm   = torch.randperm(len(all_feats))[:n]
-        feats  = all_feats[perm]
-        labels = all_labels[perm]
+        n = min(self.knn_samples, len(query_feats))
+        perm = torch.randperm(len(query_feats))[:n]
+        query_feats  = query_feats[perm]
+        query_labels = query_labels[perm]
 
-        acc = self._knn_classify(feats, labels, k=self.cfg.data.knn_k)
+        acc = self._knn_classify(query_feats, query_labels, bank_feats, bank_labels)
         self.log("val/knn_accuracy",  acc,      prog_bar=True)
         self.log("val/knn_n_samples", float(n), prog_bar=False)
 
     def _knn_classify(
         self,
-        feats:  torch.Tensor,   # (N, D)  L2-normalised val subsample
-        labels: torch.Tensor,   # (N,)
-        k: int,
+        query_feats:  torch.Tensor,   # (N_q, D)  L2-normalised query set
+        query_labels: torch.Tensor,   # (N_q,)
+        bank_feats:   torch.Tensor,   # (N_b, D)  L2-normalised feature bank
+        bank_labels:  torch.Tensor,   # (N_b,)
     ) -> float:
-        """Temperature-weighted k-NN on a subsampled validation set.
+        """Temperature-weighted k-NN: train-set bank, val-set queries.
 
         Paper (Appendix F.1, following Wu et al. 2018): votes are weighted by
         exp(cosine_sim / T) so near neighbours dominate.  Prediction is the
         class with the highest total weighted vote (argmax, not majority).
         """
-        N   = feats.shape[0]
-        T   = self.cfg.data.knn_temperature
-        n_classes = int(labels.max().item()) + 1
+        k = self.cfg.data.knn_k
+        T = self.cfg.data.knn_temperature
+        N_q = query_feats.shape[0]
+        n_classes = int(bank_labels.max().item()) + 1
 
-        sim = feats @ feats.T                           # (N, N)  cosine similarity
-        sim.fill_diagonal_(float("-inf"))               # exclude self
+        sim = query_feats @ bank_feats.T              # (N_q, N_b) cosine similarity
+        topk_sim, topk_idx = sim.topk(k, dim=1)      # (N_q, k)
+        neighbor_labels = bank_labels[topk_idx]       # (N_q, k)
 
-        topk_sim, topk_idx = sim.topk(k, dim=1)        # (N, k)
-        neighbor_labels = labels[topk_idx]              # (N, k)
+        weights = (topk_sim / T).exp()                # (N_q, k)
 
-        # Temperature-scaled weights.
-        weights = (topk_sim / T).exp()                  # (N, k)
-
-        # Weighted vote per class: (N, k, C) → sum over k → (N, C).
-        neighbor_one_hot = torch.zeros(N, k, n_classes, device=feats.device)
+        neighbor_one_hot = torch.zeros(N_q, k, n_classes, device=query_feats.device)
         neighbor_one_hot.scatter_(2, neighbor_labels.unsqueeze(2), 1.0)
-        votes = (weights.unsqueeze(2) * neighbor_one_hot).sum(1)  # (N, C)
+        votes = (weights.unsqueeze(2) * neighbor_one_hot).sum(1)  # (N_q, C)
 
         pred = votes.argmax(1)
-        return (pred == labels.to(feats.device)).float().mean().item()
+        return (pred == query_labels.to(query_feats.device)).float().mean().item()
 
     # ------------------------------------------------------------- optimizers
 

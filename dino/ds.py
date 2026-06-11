@@ -27,7 +27,7 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision.datasets import MNIST
 
 from dino.config import DINOConfig, cfg as default_cfg
-from dino.transforms import global_transform, local_transform, MNIST_MEAN, MNIST_STD
+from dino.transforms import clean_transform, global_transform, local_transform, MNIST_MEAN, MNIST_STD
 
 
 class MNISTMultiCrop(Dataset):
@@ -50,6 +50,21 @@ class MNISTMultiCrop(Dataset):
             + [t(img) for t in self.local_tfms]  # 4 × (1, 14, 14)
         )
         return crops, label
+
+
+class MNISTClean(Dataset):
+    """MNIST with a single no-augmentation transform for kNN bank/query eval."""
+
+    def __init__(self, cfg: DINOConfig, train: bool, root: str = "./data"):
+        self.base = MNIST(root=root, train=train, download=True)
+        self.tfm = clean_transform(cfg.data)
+
+    def __len__(self) -> int:
+        return len(self.base)
+
+    def __getitem__(self, idx: int):
+        img, label = self.base[idx]
+        return self.tfm(img), label
 
 
 def collate_multicrop(batch: list) -> tuple[list[torch.Tensor], torch.Tensor]:

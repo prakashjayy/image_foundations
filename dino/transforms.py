@@ -64,6 +64,15 @@ def global_transform(cfg: DataConfig) -> transforms.Compose:
     ])
 
 
+def clean_transform(cfg: DataConfig) -> transforms.Compose:
+    """No-augmentation transform for kNN bank / query evaluation."""
+    return transforms.Compose([
+        transforms.Resize(cfg.global_crop_size),
+        transforms.ToTensor(),
+        transforms.Normalize(MNIST_MEAN, MNIST_STD),
+    ])
+
+
 def local_transform(cfg: DataConfig) -> transforms.Compose:
     """Lighter augmentation for the n_local small views fed only to student.
 
